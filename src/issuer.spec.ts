@@ -47,11 +47,34 @@ describe('Issuer test',
       expect(result.controller).to.equal(controller);
     });
 
-    it('should sign', async () => {
+    it('should sign credential', async () => {
       const options = {
         'assertionMethod': identifer
       };
       const result = await issuer.sign(credential, options);
       expect(result.issuer).to.equal(controller);
+    }).slow(5000).timeout(10000);
+
+    it('should verify credential', async () => {
+      const options = {
+        'assertionMethod': identifer
+      };
+      const result = await issuer.sign(credential, options);
+      expect(result.issuer).to.equal(controller);
+      const verificationResult = await issuer.verify(result, options);
+      expect(verificationResult.verified).to.equal(true);
+    }).slow(5000).timeout(10000);
+
+    it('should sign presentation', async () => {
+      const result = await issuer.createAndSignPresentation({}, identifer, '123');
+      expect(result.proof['https://w3id.org/security#verificationMethod']['id']).to.equal(identifer);
+    }).slow(5000).timeout(10000);
+
+
+    it('should verify presentation', async () => {
+      const challenge = '123';
+      const result = await issuer.createAndSignPresentation({}, identifer, '123');
+      const verificationResult = await issuer.verifyPresentation(result, identifer, challenge);
+      expect(verificationResult.verified).to.equal(true);
     }).slow(5000).timeout(10000);
   });

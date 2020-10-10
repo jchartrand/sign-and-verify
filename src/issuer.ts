@@ -4,51 +4,9 @@ import vc from "vc-js";
 import { PublicKey } from "./types";
 import { Config, getConfig } from "./config";
 
-
-async function signCore(credJson: any, suite: any, customLoader: any = undefined, testMode = true) {
-  try {
-    let result = await vc.issue({
-      credential: credJson,
-      documentLoader: customLoader,
-      expansionMap: !testMode,
-      suite
-    });
-    return result;
-  } catch (e) {
-    console.error(e);
-    throw e;
-  }
-}
-
-async function verifyCore(result: any, suite: any, customLoader: any, testMode = true) {
-  try {
-    let valid = await vc.verifyCredential({
-      credential: { ...result },
-      documentLoader: customLoader,
-      expansionMap: !testMode,
-      suite
-    });
-    return valid;
-  }
-  catch (e) {
-    console.error(e);
-    throw e;
-  }
-}
-
-
 export function getController(fullDid: string) {
   return fullDid.split('#')[0];
 }
-
-// sample options
-/*
-const options = {
-  created: new Date().toISOString(),
-  proofPurpose: 'assertionMethod',
-  assertionMethod: assertionMethod
-};*/
-
 
 export function createIssuer(config: Config) {
   const preloadedDocs: { [key: string]: any; } = {};
@@ -78,7 +36,7 @@ export function createIssuer(config: Config) {
     const signingKey = createJwk(assertionMethod);
     const signatureSuite = new JsonWebSignature2020({
       key: signingKey,
-      date:  date
+      date: date
     });
     return signatureSuite;
   }
@@ -89,20 +47,25 @@ export function createIssuer(config: Config) {
     const controller = getController(assertionMethod);
 
     // preload docs for docLoader
-    // TODO: needs to be private
     preloadedDocs[controller] = unlockedDid;
     preloadedDocs[assertionMethod] = unlockedDid;
 
     // verify
-    return verifyCore(verifiableCredential, suite, customLoader, true);
+    let valid = await vc.verifyCredential({
+      credential: { ...verifiableCredential },
+      documentLoader: customLoader,
+      expansionMap: false,
+      suite
+    });
+    return valid;
   }
 
-  async function sign(credential: any, options: any) {
+  async function signCredential(credential: any, options: any) {
     const assertionMethod = options.assertionMethod;
     const suite = createSuite(assertionMethod);
     const controller = getController(assertionMethod);
     // update issuer id
-    if (credential['issuer'] && credential.issuer['id']) {
+    if (credential.hasOwnProperty('issuer') && credential.issuer.hasOwnProperty('id')) {
       credential.issuer.id = controller;
     } else {
       credential.issuer = controller;
@@ -113,26 +76,64 @@ export function createIssuer(config: Config) {
       credential.issuanceDate = new Date().toISOString();
     }
 
-    // sign
-    return signCore(credential, suite, customLoader);
+    let result = await vc.issue({
+      credential: credential,
+      documentLoader: customLoader,
+      expansionMap: false,
+      suite
+    });
+    return result;
+  }
 
-    // TODO: created vs issuanceDate, domain, challenge
-    // TODO: verification vs assertion method
+  // https://github.com/digitalbazaar/vc-js/blob/b5985f8e28a4cf60ac8933b47ba1cbd576de7b68/lib/vc.js
+  // TODO: assertion method
+  async function createAndSignPresentation(credential: any, assertionMethod: any, challenge: string) {
+    const suite = createSuite(assertionMethod);
+    const controller = getController(assertionMethod);
 
-    /*
-    "verificationMethod": "did:example:123#z6MksHh7qHWvybLg5QTPPdG2DgEjjduBDArV9EF9mRiRzMBN",
-    "proofPurpose": "assertionMethod",
-    "created": "2020-04-02T18:48:36Z",
-    "domain": "example.com",
-    "challenge": "d436f0c8-fbd9-4e48-bbb2-55fc5d0920a8"
-  */
+    const presentation = {
+      "@context": ["https://www.w3.org/2018/credentials/v1"],
+      "type": "VerifiablePresentation",
+      "holder": controller,
+    }
+
+    let result = await vc.signPresentation({
+      presentation: presentation,
+      documentLoader: customLoader,
+      expansionMap: false,
+      suite,
+      challenge: challenge
+    });
+    return result;
+  }
+
+  async function verifyPresentation(verifiablePresentation: any, verificationMethod: string, challenge: string) {
+    const suite = createSuite(verificationMethod);
+    const controller = getController(verificationMethod);
+  
+    // preload docs for docLoader
+    // TODO
+    preloadedDocs[controller] = unlockedDid;
+    preloadedDocs[verificationMethod] = unlockedDid;
+  
+    // verify
+    let valid = await vc.verify({
+      presentation: { ...verifiablePresentation },
+      documentLoader: customLoader,
+      challenge: challenge,
+      expansionMap: false,
+      suite
+    });
+    return valid;
   }
 
   return {
     createJwk,
     createSuite,
     verify,
-    sign
+    sign: signCredential,
+    createAndSignPresentation,
+    verifyPresentation
   }
 }
 

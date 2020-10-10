@@ -1,15 +1,23 @@
 import fastify from 'fastify';
 import { getDefaultIssuer } from './issuer';
-import { requestCredential } from './request';
+import { getDemoCredential } from './request';
 import { getConfig } from "./config"
 
-const server = fastify();
+const server = fastify({
+  logger: true
+});
 
-const { sign, verify } = getDefaultIssuer();
+const { sign, verify, verifyPresentation /*TODO*/ } = getDefaultIssuer();
 
+server.setErrorHandler(function (error, request, reply) {
+  reply
+  .code(500)
+  .header('Content-Type', 'application/json; charset=utf-8')
+  .send(error);
+});
 server.register(require('fastify-cors'), {
 
-})
+});
 
 server.get('/ping', async (request, reply) => {
   return `pong\n`
@@ -49,14 +57,38 @@ server.post(
 )
 
 server.post(
-  '/request/credentials', async (request, reply) => {
+  '/sample', async (request, reply) => {
     const requestInfo = request.body;
 
-    const result = await requestCredential(requestInfo);
+    const result = getDemoCredential(requestInfo);
     reply
       .code(201)
       .header('Content-Type', 'application/json; charset=utf-8')
       .send(result);
+  }
+)
+
+server.post(
+  '/checkDid', async (request, reply) => {
+    const requestInfo: any = request.body;
+    const challenge = requestInfo['challenge'];
+    const presentation = requestInfo['presentation'];
+
+    // TODO
+    const identifer = 'did:web:digitalcredentials.github.io#96K4BSIWAkhcclKssb8yTWMQSz4QzPWBy-JsAFlwoIs';
+
+    const verificationResult = await verifyPresentation(presentation, identifer, challenge);
+    if (verificationResult.verified) {
+      reply
+      .code(201)
+      .header('Content-Type', 'application/json; charset=utf-8')
+      .send(presentation['holder']);
+    } else {
+      reply
+      .code(500)
+      .send('Could not validate DID');
+    }
+
   }
 )
 
