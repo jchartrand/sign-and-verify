@@ -3,7 +3,7 @@ import { getDefaultIssuer } from './issuer';
 import { requestCredential } from './request';
 import { getConfig } from "./config"
 
-const { sign, verify } = getDefaultIssuer();
+const { sign } = getDefaultIssuer();
 
 const server = fastify({
   logger: true
@@ -39,12 +39,9 @@ server.get('/status', async (request, reply) => {
 
 server.post(
   '/issue/credentials', async (request, reply) => {
-    const credential = request.body;
-    //const options = requestBody['options'];
-    const options = {
-      assertionMethod: 'did:web:digitalcredentials.github.io#96K4BSIWAkhcclKssb8yTWMQSz4QzPWBy-JsAFlwoIs'
-    };
-
+    const body: any = request.body;
+    const credential = body.credential;
+    const options = body.options;
     const result = await sign(credential, options);
     reply
       .code(201)
@@ -58,14 +55,15 @@ server.post(
     const credential = request.body;
     //const options = requestBody['options'];
     const options = {
-      assertionMethod: 'did:web:digitalcredentials.github.io#96K4BSIWAkhcclKssb8yTWMQSz4QzPWBy-JsAFlwoIs'
+      verificationMethod: 'did:web:digitalcredentials.github.io#96K4BSIWAkhcclKssb8yTWMQSz4QzPWBy-JsAFlwoIs'
     };
 
-    const result = await verify(credential, options);
+    // TODO
+   /* const result = await verify(credential, options);
     reply
       .code(201)
       .header('Content-Type', 'application/json; charset=utf-8')
-      .send(result);
+      .send(result);*/
   }
 )
 

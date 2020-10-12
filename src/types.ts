@@ -26,3 +26,5 @@ export type DIDDocument = {
   "capabilityDelegation": string[],
   "capabilityInvocation": string[]
 }
+
+
